@@ -1,50 +1,69 @@
-name: Build Android APK
+name: Build Baldi's Basics in Funkin' Android
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+      - master
 
 jobs:
   build:
-    name: Build APK
+    name: Build Android APK
     runs-on: ubuntu-22.04
 
     steps:
+      # =========================
+      # 1. Baixar o código
+      # =========================
       - name: Checkout
         uses: actions/checkout@v4
 
+      # =========================
+      # 2. Java
+      # =========================
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      # =========================
+      # 3. Haxe
+      # =========================
       - name: Setup Haxe
         uses: krdlab/setup-haxe@v1
         with:
           haxe-version: '4.2.5'
 
+      # =========================
+      # 4. Android SDK
+      # =========================
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK/NDK
+      - name: Install Android SDK and NDK
         run: |
-          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
+          yes | sdkmanager --licenses || true
+
+          sdkmanager --install \
             "platform-tools" \
             "platforms;android-30" \
             "build-tools;30.0.3" \
             "ndk;21.4.7075529"
 
-          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_SDK=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> $GITHUB_ENV
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
 
+      # =========================
+      # 5. Dependências do Linux
+      # =========================
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
+
           sudo apt-get install -y \
             libasound2-dev \
             libpulse-dev \
@@ -57,12 +76,19 @@ jobs:
             libgl1-mesa-dev \
             libglu1-mesa-dev
 
+      # =========================
+      # 6. Haxelib
+      # =========================
       - name: Setup Haxelib
         run: |
           haxelib setup ~/haxelib
 
+      # =========================
+      # 7. Bibliotecas principais
+      # =========================
       - name: Install Haxe libraries
         run: |
+          haxelib install actuate
           haxelib install hxcpp
           haxelib install lime
           haxelib install openfl
@@ -71,33 +97,69 @@ jobs:
           haxelib install flixel-ui
           haxelib install hscript
 
-      - name: Setup Lime
-        run: |
-          haxelib run lime setup
-          haxelib run lime setup android
-          haxelib run lime config ANDROID_SDK "$ANDROID_SDK_ROOT"
-          haxelib run lime config ANDROID_NDK_ROOT "$ANDROID_NDK_ROOT"
-          haxelib run lime config JAVA_HOME "$JAVA_HOME"
-
+      # =========================
+      # 8. Dependências do projeto
+      # =========================
       - name: Install project libraries
         run: |
           if [ -f "haxelib.json" ]; then
             haxelib install haxelib.json
           fi
 
-      - name: Build Android
+      # =========================
+      # 9. Configurar Lime
+      # =========================
+      - name: Setup Lime
+        run: |
+          haxelib run lime setup
+          haxelib run lime setup android
+
+          haxelib run lime config ANDROID_SDK "$ANDROID_SDK_ROOT"
+          haxelib run lime config ANDROID_NDK_ROOT "$ANDROID_NDK_ROOT"
+
+      # =========================
+      # 10. Mostrar versões
+      # =========================
+      - name: Check environment
+        run: |
+          echo "Haxe:"
+          haxe --version
+
+          echo "Haxelib:"
+          haxelib list
+
+          echo "Android SDK:"
+          echo "$ANDROID_SDK_ROOT"
+
+          echo "Android NDK:"
+          echo "$ANDROID_NDK_ROOT"
+
+      # =========================
+      # 11. Compilar Android
+      # =========================
+      - name: Build Android APK
         run: |
           haxelib run lime build android -release
 
+      # =========================
+      # 12. Procurar APK
+      # =========================
       - name: Find APK
         run: |
-          find export -type f -name "*.apk" -print
+          echo "Procurando APK..."
 
+          find . \
+            -type f \
+            -name "*.apk" \
+            -print
+
+      # =========================
+      # 13. Upload do APK
+      # =========================
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Baldis-Basics-in-Funkin-Android
           path: |
-            export/**/*.apk
-            export/**/bin/**/*.apk
+            **/*.apk
           if-no-files-found: error
