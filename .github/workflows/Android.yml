@@ -1,4 +1,4 @@
-name: Build Baldi's Basics in Funkin' - Android
+name: Build Baldi's Basics in Funkin - Android
 
 on:
   workflow_dispatch:
@@ -8,47 +8,37 @@ on:
       - master
 
 jobs:
-  build:
-    name: Build Android APK
+  build-android:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout
+      - name: Baixar código
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Haxe
+      - name: Configurar Haxe
         uses: krdlab/setup-haxe@v1
         with:
           haxe-version: '4.2.5'
 
-      - name: Setup Android SDK
+      - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK and NDK
+      - name: Instalar componentes Android
         run: |
-          yes | sdkmanager --licenses || true
+          sdkmanager --install "platform-tools"
+          sdkmanager --install "platforms;android-30"
+          sdkmanager --install "build-tools;30.0.3"
+          sdkmanager --install "ndk;21.4.7075529"
 
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-30" \
-            "build-tools;30.0.3" \
-            "ndk;21.4.7075529"
-
-          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
-
-      - name: Install Linux dependencies
+      - name: Instalar dependências Linux
         run: |
           sudo apt-get update
-
           sudo apt-get install -y \
             build-essential \
             cmake \
@@ -67,39 +57,58 @@ jobs:
             libgl1-mesa-dev \
             libglu1-mesa-dev
 
-      - name: Setup Haxelib
+      - name: Configurar haxelib
         run: |
-          haxelib setup ~/haxelib
+          mkdir -p "$HOME/haxelib"
+          haxelib setup "$HOME/haxelib"
 
-      - name: Install Haxe libraries
+      - name: Instalar bibliotecas Haxe
+        shell: bash
         run: |
-          haxelib install actuate
-          haxelib install extension-webm
-          haxelib install newgrounds
-          haxelib install polymod
-          haxelib install hxcpp
-          haxelib install lime
-          haxelib install openfl
-          haxelib install flixel
-          haxelib install flixel-addons
-          haxelib install flixel-ui
-          haxelib install hscript
+          set -e
 
-      - name: Install project dependencies
+          haxelib install actuate --always
+          haxelib install extension-webm --always
+          haxelib install newgrounds --always
+          haxelib install polymod --always
+          haxelib install hxcpp --always
+          haxelib install lime --always
+          haxelib install openfl --always
+          haxelib install flixel --always
+          haxelib install flixel-addons --always
+          haxelib install flixel-ui --always
+          haxelib install hscript --always
+
+      - name: Instalar dependências do projeto
+        shell: bash
         run: |
           if [ -f "haxelib.json" ]; then
-            haxelib install haxelib.json
+            echo "Encontrado haxelib.json"
+            haxelib install haxelib.json --always
+          else
+            echo "Nenhum haxelib.json encontrado."
           fi
 
-      - name: Setup Lime
+      - name: Configurar Lime
+        shell: bash
         run: |
           haxelib run lime setup
           haxelib run lime setup android
 
-          haxelib run lime config ANDROID_SDK "$ANDROID_SDK_ROOT"
-          haxelib run lime config ANDROID_NDK_ROOT "$ANDROID_NDK_ROOT"
+      - name: Configurar caminhos Android
+        shell: bash
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-      - name: Check environment
+          if [ -z "$ANDROID_NDK_HOME" ]; then
+            export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/21.4.7075529"
+          fi
+
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+
+      - name: Verificar ambiente
+        shell: bash
         run: |
           echo "===== HAXE ====="
           haxe --version
@@ -107,19 +116,138 @@ jobs:
           echo "===== HAXELIB ====="
           haxelib list
 
-          echo "===== ANDROID SDK ====="
-          echo "$ANDROID_SDK_ROOT"
+          echo "===== LIME ====="
+          haxelib run lime --version
 
-          echo "===== ANDROID NDK ====="
-          echo "$ANDROID_NDK_ROOT"
+          echo "===== ANDROID ====="
+          adb version || true
 
-      # ==========================================
-      # LOCALIZAR EXTENSION-WEBM
-      # ==========================================
-      - name: Locate extension-webm
+          echo "===== NDK ====="
+          ls -la "$ANDROID_HOME/ndk/21.4.7075529" || true
+
+      - name: Localizar extension-webm
         shell: bash
         run: |
           echo "Saída do haxelib:"
           haxelib path extension-webm
 
-          WEBM_PATH
+          WEBM_PATH="$(haxelib path extension-webm | grep '^-L ' | head -n 1 | sed 's/^-L //')"
+
+          echo "WEBM_PATH=$WEBM_PATH"
+
+          if [ -z "$WEBM_PATH" ]; then
+            echo "ERRO: não foi possível encontrar o caminho do extension-webm"
+            exit 1
+          fi
+
+          if [ ! -d "$WEBM_PATH" ]; then
+            echo "ERRO: diretório não existe:"
+            echo "$WEBM_PATH"
+            exit 1
+          fi
+
+          echo "Extension WebM encontrado em:"
+          cd -- "$WEBM_PATH"
+
+          pwd
+          echo "===== CONTEÚDO ====="
+          ls -la
+
+      - name: Verificar bibliotecas WebM
+        shell: bash
+        run: |
+          echo "Procurando bibliotecas nativas do extension-webm..."
+
+          find "$HOME/haxelib/extension-webm" \
+            -type f \
+            \( -name "*.so" -o -name "*.a" -o -name "*.aar" \) \
+            -print || true
+
+      - name: Verificar arquivos do projeto
+        shell: bash
+        run: |
+          echo "===== RAIZ ====="
+          ls -la
+
+          echo "===== SOURCE ====="
+          if [ -d source ]; then
+            find source -maxdepth 2 -type f | head -100
+          fi
+
+          echo "===== ASSETS ====="
+          if [ -d assets ]; then
+            find assets -maxdepth 2 -type f | head -100
+          fi
+
+          echo "===== PROJECT.XML ====="
+          if [ -f Project.xml ]; then
+            cat Project.xml
+          else
+            echo "Project.xml não encontrado!"
+          fi
+
+      - name: Preparar projeto Lime
+        shell: bash
+        run: |
+          set -e
+
+          if [ -f Project.xml ]; then
+            echo "Project.xml encontrado."
+            haxelib run lime config Project.xml
+          else
+            echo "Project.xml não encontrado."
+            exit 1
+          fi
+
+      - name: Compilar Android Release
+        shell: bash
+        run: |
+          set -e
+
+          echo "======================================"
+          echo "INICIANDO BUILD ANDROID RELEASE"
+          echo "======================================"
+
+          haxelib run lime build android -release
+
+      - name: Procurar APK
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "PROCURANDO APK"
+          echo "======================================"
+
+          find . -type f -name "*.apk" -print
+
+          APK_COUNT=$(find . -type f -name "*.apk" | wc -l)
+
+          echo "Quantidade de APKs: $APK_COUNT"
+
+          if [ "$APK_COUNT" -eq 0 ]; then
+            echo "ERRO: nenhum APK foi gerado!"
+            exit 1
+          fi
+
+      - name: Preparar APK
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p apk
+
+          APK=$(find . -type f -name "*.apk" | head -n 1)
+
+          echo "APK encontrado:"
+          echo "$APK"
+
+          cp "$APK" "apk/Baldis-Basics-in-Funkin.apk"
+
+          echo "APK final:"
+          ls -lh apk/Baldis-Basics-in-Funkin.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Baldis-Basics-in-Funkin-Android
+          path: apk/Baldis-Basics-in-Funkin.apk
+          if-no-files-found: error
