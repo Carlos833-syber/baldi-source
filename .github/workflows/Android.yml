@@ -1,4 +1,4 @@
-name: Build Baldi's Basics in Funkin' - Android
+name: Build Baldi's Basics in Funkin' Android
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ jobs:
     steps:
 
       # ==========================================
-      # 1. Baixar o repositório
+      # 1. Código
       # ==========================================
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,12 +40,9 @@ jobs:
       # ==========================================
       # 4. Android SDK
       # ==========================================
-      - name: Setup Android SDK
+      - name: Setup Android
         uses: android-actions/setup-android@v3
 
-      # ==========================================
-      # 5. Android SDK + NDK
-      # ==========================================
       - name: Install Android SDK and NDK
         run: |
           yes | sdkmanager --licenses || true
@@ -62,7 +59,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
 
       # ==========================================
-      # 6. Dependências do Ubuntu
+      # 5. Dependências Linux
       # ==========================================
       - name: Install Linux dependencies
         run: |
@@ -85,3 +82,191 @@ jobs:
             libxi-dev \
             libgl1-mesa-dev \
             libglu1-mesa-dev
+
+      # ==========================================
+      # 6. Haxelib
+      # ==========================================
+      - name: Setup Haxelib
+        run: |
+          haxelib setup ~/haxelib
+
+      # ==========================================
+      # 7. Bibliotecas
+      # ==========================================
+      - name: Install Haxe libraries
+        run: |
+          haxelib install actuate
+          haxelib install extension-webm
+          haxelib install newgrounds
+          haxelib install polymod
+
+          haxelib install hxcpp
+          haxelib install lime
+          haxelib install openfl
+          haxelib install flixel
+          haxelib install flixel-addons
+          haxelib install flixel-ui
+          haxelib install hscript
+
+      # ==========================================
+      # 8. Dependências do projeto
+      # ==========================================
+      - name: Install project dependencies
+        run: |
+          if [ -f "haxelib.json" ]; then
+            haxelib install haxelib.json
+          fi
+
+      # ==========================================
+      # 9. Lime
+      # ==========================================
+      - name: Setup Lime
+        run: |
+          haxelib run lime setup
+          haxelib run lime setup android
+
+          haxelib run lime config ANDROID_SDK "$ANDROID_SDK_ROOT"
+          haxelib run lime config ANDROID_NDK_ROOT "$ANDROID_NDK_ROOT"
+
+      # ==========================================
+      # 10. Ambiente
+      # ==========================================
+      - name: Check environment
+        run: |
+          echo "===== HAXE ====="
+          haxe --version
+
+          echo "===== HAXELIB ====="
+          haxelib list
+
+          echo "===== ANDROID SDK ====="
+          echo "$ANDROID_SDK_ROOT"
+
+          echo "===== ANDROID NDK ====="
+          echo "$ANDROID_NDK_ROOT"
+
+      # ==========================================
+      # 11. Extension WebM
+      # ==========================================
+      - name: Locate extension-webm
+        run: |
+          WEBM_PATH=$(haxelib path extension-webm | head -n 1)
+
+          echo "WEBM_PATH=$WEBM_PATH" >> "$GITHUB_ENV"
+
+          echo "Extension WebM:"
+          echo "$WEBM_PATH"
+
+      - name: Build extension-webm
+        run: |
+          cd "$WEBM_PATH"
+
+          if [ -f "project.xml" ]; then
+            haxelib run lime rebuild android
+          elif [ -f "Project.xml" ]; then
+            haxelib run lime rebuild android
+          else
+            echo "project.xml não encontrado"
+            find . -maxdepth 5 -type f | sort
+            exit 1
+          fi
+
+      # ==========================================
+      # 12. Verificar WebM
+      # ==========================================
+      - name: Check WebM libraries
+        run: |
+          echo "===== EXTENSION WEBM ====="
+
+          find "$HOME/haxelib/extension-webm" \
+            -type f \
+            \( -name "*.so" -o -name "*.a" \) \
+            -print || true
+
+      # ==========================================
+      # 13. Limpar build antigo
+      # ==========================================
+      - name: Clean Lime build
+        run: |
+          haxelib run lime clean android || true
+
+      # ==========================================
+      # 14. Compilar Android
+      # ==========================================
+      - name: Build Android APK
+        run: |
+          haxelib run lime build android -release
+
+      # ==========================================
+      # 15. Procurar APK
+      # ==========================================
+      - name: Find generated APK
+        run: |
+          echo "================================"
+          echo "PROCURANDO APK"
+          echo "================================"
+
+          find "$GITHUB_WORKSPACE" \
+            -type f \
+            -iname "*.apk" \
+            -print
+
+          echo "================================"
+          echo "PASTAS EXPORT"
+          echo "================================"
+
+          if [ -d "$GITHUB_WORKSPACE/export" ]; then
+            find "$GITHUB_WORKSPACE/export" \
+              -maxdepth 8 \
+              -type f \
+              -print
+          else
+            echo "A pasta export não existe."
+          fi
+
+      # ==========================================
+      # 16. Preparar APK
+      # ==========================================
+      - name: Prepare APK
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/apk"
+
+          APK=$(find "$GITHUB_WORKSPACE" \
+            -type f \
+            -iname "*.apk" \
+            ! -path "$GITHUB_WORKSPACE/apk/*" \
+            | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "================================"
+            echo "ERRO: APK NÃO ENCONTRADO"
+            echo "================================"
+
+            echo "Conteúdo do projeto:"
+            find "$GITHUB_WORKSPACE" \
+              -maxdepth 5 \
+              -type f \
+              | sort \
+              | head -500
+
+            exit 1
+          fi
+
+          echo "APK encontrado:"
+          echo "$APK"
+
+          cp "$APK" \
+            "$GITHUB_WORKSPACE/apk/Baldis-Basics-in-Funkin.apk"
+
+          echo "APK preparado:"
+          ls -lh "$GITHUB_WORKSPACE/apk/"
+
+      # ==========================================
+      # 17. Upload do APK
+      # ==========================================
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Baldis-Basics-in-Funkin-Android
+          path: apk/Baldis-Basics-in-Funkin.apk
+          if-no-files-found: error
