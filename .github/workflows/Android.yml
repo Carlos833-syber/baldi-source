@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -78,7 +77,6 @@ jobs:
           haxelib install extension-webm
           haxelib install newgrounds
           haxelib install polymod
-
           haxelib install hxcpp
           haxelib install lime
           haxelib install openfl
@@ -116,96 +114,12 @@ jobs:
           echo "$ANDROID_NDK_ROOT"
 
       # ==========================================
-      # Corrigido: localizar extension-webm
+      # LOCALIZAR EXTENSION-WEBM
       # ==========================================
       - name: Locate extension-webm
         shell: bash
         run: |
-          WEBM_PATH=$(haxelib path extension-webm \
-            | sed 's/^- //' \
-            | grep '/extension-webm/' \
-            | head -n 1)
+          echo "Saída do haxelib:"
+          haxelib path extension-webm
 
-          if [ -z "$WEBM_PATH" ]; then
-            echo "Não foi possível localizar extension-webm."
-
-            echo "Saída do haxelib:"
-            haxelib path extension-webm
-
-            exit 1
-          fi
-
-          echo "Extension WebM encontrada:"
-          echo "$WEBM_PATH"
-
-          echo "WEBM_PATH=$WEBM_PATH" >> "$GITHUB_ENV"
-
-      # ==========================================
-      # Compilar extension-webm
-      # ==========================================
-      - name: Build extension-webm Android
-        shell: bash
-        run: |
-          echo "Entrando em:"
-          echo "$WEBM_PATH"
-
-          cd -- "$WEBM_PATH"
-
-          if [ -f "project.xml" ]; then
-            haxelib run lime rebuild android
-
-          elif [ -f "Project.xml" ]; then
-            haxelib run lime rebuild android
-
-          else
-            echo "ERRO: project.xml não encontrado."
-
-            echo "Arquivos encontrados:"
-            find . -maxdepth 5 -type f | sort
-
-            exit 1
-          fi
-
-      # ==========================================
-      # Verificar biblioteca WebM
-      # ==========================================
-      - name: Check WebM libraries
-        shell: bash
-        run: |
-          echo "===== BIBLIOTECAS WEBM ====="
-
-          find "$HOME/haxelib/extension-webm" \
-            -type f \
-            -name "*.so" -o -name "*.a" \
-            -print || true
-
-      # ==========================================
-      # Limpar build Android
-      # ==========================================
-      - name: Clean Android
-        run: |
-          haxelib run lime clean android || true
-
-      # ==========================================
-      # Compilar jogo
-      # ==========================================
-      - name: Build Android APK
-        run: |
-          haxelib run lime build android -release
-
-      # ==========================================
-      # Procurar APK
-      # ==========================================
-      - name: Find generated APK
-        shell: bash
-        run: |
-          echo "================================"
-          echo "PROCURANDO APK"
-          echo "================================"
-
-          find "$GITHUB_WORKSPACE" \
-            -type f \
-            -iname "*.apk" \
-            -print
-
-      # =================================
+          WEBM_PATH
