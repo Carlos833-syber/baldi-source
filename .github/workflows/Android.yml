@@ -67,6 +67,7 @@ jobs:
         run: |
           haxelib install actuate
           haxelib install extension-webm
+          haxelib install newgrounds
           haxelib install hxcpp
           haxelib install lime
           haxelib install openfl
@@ -85,10 +86,11 @@ jobs:
         run: |
           haxelib run lime setup
           haxelib run lime setup android
+
           haxelib run lime config ANDROID_SDK "$ANDROID_SDK_ROOT"
           haxelib run lime config ANDROID_NDK_ROOT "$ANDROID_NDK_ROOT"
 
-      - name: Check libraries
+      - name: Check Haxelib
         run: |
           haxelib list
 
