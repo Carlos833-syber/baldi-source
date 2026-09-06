@@ -1,0 +1,55 @@
+      # ==========================================
+      # Compilar Android
+      # ==========================================
+      - name: Build Android APK
+        run: |
+          haxelib run lime build android -release
+
+      # ==========================================
+      # Procurar APK em qualquer pasta
+      # ==========================================
+      - name: Find generated APK
+        run: |
+          echo "===== PROCURANDO APK ====="
+
+          find "$GITHUB_WORKSPACE" \
+            -type f \
+            -iname "*.apk" \
+            -print
+
+          echo "===== FIM ====="
+
+      # ==========================================
+      # Copiar APK para uma pasta simples
+      # ==========================================
+      - name: Prepare APK
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/apk"
+
+          APK=$(find "$GITHUB_WORKSPACE" \
+            -type f \
+            -iname "*.apk" \
+            ! -path "$GITHUB_WORKSPACE/apk/*" \
+            | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "ERRO: nenhum APK foi encontrado!"
+            exit 1
+          fi
+
+          echo "APK encontrado:"
+          echo "$APK"
+
+          cp "$APK" "$GITHUB_WORKSPACE/apk/Baldis-Basics-in-Funkin.apk"
+
+          ls -lh "$GITHUB_WORKSPACE/apk/"
+
+      # ==========================================
+      # Upload do APK
+      # ==========================================
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Baldis-Basics-in-Funkin-Android
+          path: apk/Baldis-Basics-in-Funkin.apk
+          if-no-files-found: error
