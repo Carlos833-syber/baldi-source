@@ -1,4 +1,4 @@
-name: Build Baldi's Basics in Funkin' Android
+name: Build Baldi's Basics in Funkin' - Android
 
 on:
   workflow_dispatch:
@@ -13,35 +13,39 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # =========================
-      # Checkout
-      # =========================
+
+      # ==========================================
+      # 1. Baixar o repositório
+      # ==========================================
       - name: Checkout
         uses: actions/checkout@v4
 
-      # =========================
-      # Java
-      # =========================
+      # ==========================================
+      # 2. Java
+      # ==========================================
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # =========================
-      # Haxe
-      # =========================
+      # ==========================================
+      # 3. Haxe
+      # ==========================================
       - name: Setup Haxe
         uses: krdlab/setup-haxe@v1
         with:
           haxe-version: '4.2.5'
 
-      # =========================
-      # Android
-      # =========================
+      # ==========================================
+      # 4. Android SDK
+      # ==========================================
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # ==========================================
+      # 5. Android SDK + NDK
+      # ==========================================
       - name: Install Android SDK and NDK
         run: |
           yes | sdkmanager --licenses || true
@@ -57,14 +61,20 @@ jobs:
           echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/21.4.7075529" >> "$GITHUB_ENV"
 
-      # =========================
-      # Dependências Linux
-      # =========================
+      # ==========================================
+      # 6. Dependências do Ubuntu
+      # ==========================================
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
 
           sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            git \
+            unzip \
+            zip \
             libasound2-dev \
             libpulse-dev \
             libx11-dev \
@@ -75,90 +85,3 @@ jobs:
             libxi-dev \
             libgl1-mesa-dev \
             libglu1-mesa-dev
-
-      # =========================
-      # Haxelib
-      # =========================
-      - name: Setup Haxelib
-        run: |
-          haxelib setup ~/haxelib
-
-      # =========================
-      # Bibliotecas Haxe
-      # =========================
-      - name: Install Haxe libraries
-        run: |
-          haxelib install actuate
-          haxelib install extension-webm
-          haxelib install newgrounds
-          haxelib install polymod
-          haxelib install hxcpp
-          haxelib install lime
-          haxelib install openfl
-          haxelib install flixel
-          haxelib install flixel-addons
-          haxelib install flixel-ui
-          haxelib install hscript
-
-      # =========================
-      # Dependências do projeto
-      # =========================
-      - name: Install project dependencies
-        run: |
-          if [ -f "haxelib.json" ]; then
-            haxelib install haxelib.json
-          fi
-
-      # =========================
-      # Lime
-      # =========================
-      - name: Setup Lime
-        run: |
-          haxelib run lime setup
-          haxelib run lime setup android
-
-          haxelib run lime config ANDROID_SDK "$ANDROID_SDK_ROOT"
-          haxelib run lime config ANDROID_NDK_ROOT "$ANDROID_NDK_ROOT"
-
-      # =========================
-      # Verificar ambiente
-      # =========================
-      - name: Check environment
-        run: |
-          echo "===== HAXE ====="
-          haxe --version
-
-          echo "===== HAXELIB ====="
-          haxelib list
-
-          echo "===== ANDROID SDK ====="
-          echo "$ANDROID_SDK_ROOT"
-
-          echo "===== ANDROID NDK ====="
-          echo "$ANDROID_NDK_ROOT"
-
-      # =========================
-      # Compilar APK
-      # =========================
-      - name: Build Android APK
-        run: |
-          haxelib run lime build android -release
-
-      # =========================
-      # Procurar APK
-      # =========================
-      - name: Find APK
-        run: |
-          echo "===== APKs encontrados ====="
-          find . -type f -name "*.apk" -print
-
-      # =========================
-      # Enviar APK para Artifacts
-      # =========================
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Baldis-Basics-in-Funkin-Android
-          path: |
-            **/*.apk
-          if-no-files-found: error
